@@ -26,7 +26,6 @@ $ python fiji_track_processor.py \
     --peak_detection \
     --num_peaks_filter 2
 ```
-Plot two tracks overlayed by frame.
 
 Note: if using multiple CSVs, you MUST format the CSVs to have the same column indexes for "FRAME", "TOTAL_INTENSITY_CH1", and "TRACK_ID"
 ```sh
