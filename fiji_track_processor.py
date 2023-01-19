@@ -353,26 +353,3 @@ def main() -> None:
 if __name__ == '__main__':
     main()
 
-'''
-# If using multiple CSVs, you MUST format the CSVs to have the same column index for "FRAME", "TOTAL_INTENSITY_CH1", and "TRACK_ID"
-
-# plot a single trackfile
-python fiji_track_processor.py \
-    --trackfile_1 ../single_cells.csv \
-    --gene_1 her1 \
-    --frame_idx 8 \
-    --intensity_idx 15 \
-    --trackid_idx 2 \
-    --peak_detection \
-    --num_peaks_filter 2
-
-# plot two trackfiles merged
-python fiji_track_processor.py \
-    --trackfile_1 ../her1.csv \
-    --gene_1 her1 \
-    --trackfile_2 ../securin.csv \
-    --gene_2 securin \
-    --frame_idx 8 \
-    --intensity_idx 26 \
-    --trackid_idx 2
-'''
