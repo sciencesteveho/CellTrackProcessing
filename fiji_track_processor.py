@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 #
 # // TO-DO //
+# - [X] implement fft 
 # - [ ] calculate periodicity 
+#   - [ ] period on the Y axis, number of cycles on the X axis
 # - [ ] add peak selection for merge, such that plots will only include graphs where both transgenes hit the required number of peaks
 # - [ ] automatically choose nums for subplots based on parser input
 
@@ -14,11 +16,12 @@ import argparse
 import numpy as np
 import pandas as pd
 
-import more_itertools as mit
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-
 from typing import Any, Dict, List
+
+import matplotlib.patches as mpatches
+import more_itertools as mit
+import scipy.fft
 from scipy.signal import find_peaks
 
 
@@ -87,6 +90,7 @@ class FijiTrackProcessor:
         trackid_idx: int,
         peak_detection: bool,
         num_peaks_filter: int,
+        fourier_transform: bool,
         # plots_per_image: int,
         ):
         """Initialize the class"""
@@ -99,6 +103,7 @@ class FijiTrackProcessor:
         self.trackid_idx = trackid_idx
         self.peak_detection = peak_detection
         self.num_peaks_filter = num_peaks_filter
+        self.fourier_transform = fourier_transform
         # self.plots_per_image = plots_per_image
 
         # set matplotlib plotting style
@@ -308,6 +313,10 @@ class FijiTrackProcessor:
         
         # plot
         chunks = self._chunklist(self.trackfile)
+        if self.fourier_transform:
+            for chunk in chunks:
+                for subchunk in chunk:
+                    subchunk.iloc[:,1] = scipy.fft.fft(subchunk.iloc[:,1])
         for index, miniframe in enumerate(chunks):
             self._plot_intensities(
                 10,
@@ -329,6 +338,7 @@ def main() -> None:
     parser.add_argument('-t', '--trackid_idx', help='0-indexed column number for "TRACK_ID"', type=int)
     parser.add_argument('-p', '--peak_detection', help="Option to run peak detection", action='store_true')
     parser.add_argument('-n', '--num_peaks_filter', help="Option to filter peaks. Use '0' for no filtering", type=int)
+    parser.add_argument('-fft', '--fourier_transform', help="Option to run use fourier transform", action='store_true')
     # parser.add_argument('-ppi', '--plots_per_image', help="Number of plots per image", type=int)
     args = parser.parse_args()
 
@@ -343,6 +353,7 @@ def main() -> None:
         args.trackid_idx,
         args.peak_detection,
         args.num_peaks_filter,
+        args.fourier_transform,
         # args.plots_per_image,
         )
     

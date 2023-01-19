@@ -45,6 +45,17 @@ $ python fiji_track_processor.py \
     --intensity_idx 26 \
     --trackid_idx 2
 ```
+
+```sh
+# plot fourier transformed graphs to look at frequency
+python fiji_track_processor.py \
+    --trackfile_1 path/to/single_cells.csv \
+    --gene_1 her1 \
+    --frame_idx 8 \
+    --intensity_idx 15 \
+    --trackid_idx 2 \
+    --fourier_transform
+```
 &nbsp;
 ## Dependencies
 
