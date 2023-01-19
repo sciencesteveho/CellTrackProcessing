@@ -2,7 +2,10 @@
 # -*- coding: utf-8 -*-
 #
 # // TO-DO //
-# - [ ] use custom colors pls no default or arthur will yell
+# - [X] implement fft 
+# - [X] calculate periodicity 
+#   - [X] plot period on the Y axis, number of cycles on the X axis
+# - [ ] automatically get idx cols from CSV header
 # - [ ] add peak selection for merge, such that plots will only include graphs where both transgenes hit the required number of peaks
 # - [ ] automatically choose nums for subplots based on parser input
 
@@ -92,13 +95,11 @@ class FijiTrackProcessor:
         # set matplotlib plotting style
         self._set_matplotlib_params()
 
-        # set output filename
+        # set output filename based on number of provided tracks
         if self.trackfile_1 and self.trackfile_2:
             self.filename = f'{self.gene_1}_{self.gene_2}_'
         elif self.periodicity:
             self.filename = f'{self.gene_1}_periodicity_'
-        elif self.fourier_transform:
-            self.filename = f'{self.gene_1}_fourier_'
         else:
             self.filename = f'{self.gene_1}_'
 
@@ -137,10 +138,7 @@ class FijiTrackProcessor:
         colnames = colnames[0]
         frame_idx = colnames.index('FRAME')
         trackid_idx = colnames.index('TRACK_ID')
-        try:
-            intensity_idx = colnames.index('TOTAL_INTENSITY_CH1')
-        except ValueError:
-            intensity_idx = colnames.index('TOTAL_INTENSITY')
+        intensity_idx = colnames.index('TOTAL_INTENSITY_CH1')
 
         with open(trackfile, newline = '') as file:
             file_reader = csv.reader(file, delimiter=',')
@@ -148,17 +146,17 @@ class FijiTrackProcessor:
             intensities = {}
             for index, items in enumerate(file_reader):
                 if index == 0:  # first trackid
-                    trackid = items[trackid_idx]
+                    trackid = items[self.trackid_idx]
                     templist = []
                     templist.append(
-                        (items[frame_idx],
-                        int(items[intensity_idx]))
+                        (items[self.frame_idx],
+                        int(items[self.intensity_idx]))
                         )
                 elif index != length-2:  # append if not a new id, else, continue
-                    if items[trackid_idx] != str(int(trackid) + 1):
+                    if items[self.trackid_idx] != str(int(trackid) + 1):
                         templist.append(
-                            (items[frame_idx],
-                            int(items[intensity_idx]))
+                            (items[self.frame_idx],
+                            int(items[self.intensity_idx]))
                             )
                     else:
                         intensities[int(trackid)] = pd.DataFrame(
@@ -166,15 +164,15 @@ class FijiTrackProcessor:
                             columns=['frame', gene + "_" + trackid]
                             )
                         templist = []
-                        trackid = items[trackid_idx]
+                        trackid = items[self.trackid_idx]
                         templist.append(
-                            (items[frame_idx],
-                            int(items[intensity_idx]))
+                            (items[self.frame_idx],
+                            int(items[self.intensity_idx]))
                             )
                 else:  # append at last line
                     templist.append(
-                        (items[frame_idx],
-                        int(items[intensity_idx]))
+                        (items[self.frame_idx],
+                        int(items[self.intensity_idx]))
                         )
                     intensities[int(trackid)] = pd.DataFrame(
                         templist,
@@ -287,9 +285,9 @@ class FijiTrackProcessor:
         _, axes = plt.subplots(nrow, ncol)
         for r in range(nrow):
             for c in range(ncol):
-                if self.periodicity or len(self.peaks) <= 1:
+                if self.periodicity:
                     frames[count].plot(ax=axes[r,c], color=['blue', 'red'])
-                else: 
+                elif len(self.peaks) > 1:
                     if frames[count].columns[0] == 'dummy':
                         frames[count].plot(ax=axes[r,c], color=['blue', 'red'])
                     else:
@@ -312,57 +310,6 @@ class FijiTrackProcessor:
         plt.savefig((f'{self.filename}{str(num)}.png'), format='png', dpi=300, bbox_inches='tight')
         plt.close()
 
-    def plot_oscillations(self) -> None:
-        """_summary_
-
-        Args:
-            a // _description_
-            b // _description_
-
-        Raises:
-            AssertionError: _description_
-        
-        Returns:
-            c -- _description_
-        """
-        self.trackfile = self._dict_of_frame_intensities(self.trackfile_1, self.gene_1)
-
-        # get peaks
-        if self.peak_detection:
-            self.peaks = self._detect_peaks(self.trackfile)
-        else:
-            self.peaks = {}
-
-        # filter
-        if self.num_peaks_filter:
-            self.trackfile, self.peaks = self._filter_n_peaks(self.trackfile, self.peaks)
-
-        # calculate periodicity
-        if self.periodicity:
-            self.trackfile = self._periodicity(self.trackfile, self.gene_1)
-
-        # track merge if two files are provided
-        if self.trackfile_1 and self.trackfile_2:
-            track_2 = self._dict_of_frame_intensities(self.trackfile_2, self.gene_2)
-            merged = self._combine_tracks(self.trackfile, track_2)
-            self.trackfile = list_from_dictvals(merged)
-        else:
-            self.trackfile = list_from_dictvals(self.trackfile)
-        
-        # plot 
-        chunks = self._chunklist(self.trackfile)
-        if self.fourier_transform:
-            for chunk in chunks:
-                for subchunk in chunk:
-                    subchunk.iloc[:,1] = scipy.fft.fft(subchunk.iloc[:,1])
-        for index, miniframe in enumerate(chunks):
-            self._plot_intensities(
-                10,
-                10,
-                miniframe,
-                index,
-                )
-
 
 def main() -> None:
     """Pipeline to process track data"""
@@ -371,6 +318,9 @@ def main() -> None:
     parser.add_argument('-track_2', '--trackfile_2', help='second transgene trackfile.csv from Fiji', type=str)
     parser.add_argument('-g1', '--gene_1', help='Name of first transgene', type=str)
     parser.add_argument('-g2', '--gene_2', help='Name of first transgene', type=str)
+    parser.add_argument('-f', '--frame_idx', help='0-indexed column number for "FRAME"', type=int)
+    parser.add_argument('-i', '--intensity_idx', help='0-indexed column number for "TOTAL_INTENSITY_CH1"', type=int)
+    parser.add_argument('-t', '--trackid_idx', help='0-indexed column number for "TRACK_ID"', type=int)
     parser.add_argument('-p', '--peak_detection', help="Option to run peak detection", action='store_true')
     parser.add_argument('-n', '--num_peaks_filter', help="Option to filter peaks. Use '0' for no filtering", type=int)
     parser.add_argument('-fft', '--fourier_transform', help="Option to run use fourier transform", action='store_true')
@@ -380,21 +330,86 @@ def main() -> None:
 
     # instantiate object
     fijitrackObject = FijiTrackProcessor(
-        args.trackfile_1,
-        args.trackfile_2,
-        args.gene_1,
-        args.gene_2,
-        args.peak_detection,
-        args.num_peaks_filter,
-        args.fourier_transform,
-        args.periodicity,
+        '../single_cells.csv',
+        None,
+        'her1',
+        None,
+        8,
+        15,
+        2,
+        True,
+        2,
+        False,
+        True,
         # args.plots_per_image,
         )
     
-    # run pipeline! 
-    fijitrackObject.plot_oscillations()
+    fijitrackObject.trackfile = fijitrackObject._dict_of_frame_intensities(fijitrackObject.trackfile_1, fijitrackObject.gene_1)
+
+    # get peaks
+    if fijitrackObject.peak_detection:
+        fijitrackObject.peaks = fijitrackObject._detect_peaks(fijitrackObject.trackfile)
+    else:
+        fijitrackObject.peaks = {}
+
+    # filter
+    if fijitrackObject.num_peaks_filter:
+        fijitrackObject.trackfile, fijitrackObject.peaks = fijitrackObject._filter_n_peaks(fijitrackObject.trackfile, fijitrackObject.peaks)
+
+    # calculate periodicity
+    if fijitrackObject.periodicity:
+        fijitrackObject.trackfile = fijitrackObject._periodicity(fijitrackObject.trackfile, fijitrackObject.gene_1)
+
+    # track merge if two files are provided
+    if fijitrackObject.trackfile_1 and fijitrackObject.trackfile_2:
+        track_2 = fijitrackObject._dict_of_frame_intensities(fijitrackObject.trackfile_2, fijitrackObject.gene_2)
+        merged = fijitrackObject._combine_tracks(fijitrackObject.trackfile, track_2)
+        fijitrackObject.trackfile = list_from_dictvals(merged)
+    else:
+        fijitrackObject.trackfile = list_from_dictvals(fijitrackObject.trackfile)
+    
+    # plot 
+    chunks = fijitrackObject._chunklist(fijitrackObject.trackfile)
+    if fijitrackObject.fourier_transform:
+        for chunk in chunks:
+            for subchunk in chunk:
+                subchunk.iloc[:,1] = scipy.fft.fft(subchunk.iloc[:,1])
+    for index, miniframe in enumerate(chunks):
+        fijitrackObject._plot_intensities(
+            10,
+            10,
+            miniframe,
+            index,
+            )
+
+'''
+python fiji_track_processor.py \
+    --trackfile_1 ../single_cells.csv \
+    --gene_1 her1 
+
+python fiji_track_processor.py \
+    --trackfile_1 ../single_cells.csv \
+    --gene_1 her1 \
+    --peak_detection \
+    --num_peaks_filter 2
+
+python fiji_track_processor.py \
+    --trackfile_1 ../single_cells.csv \
+    --gene_1 her1 \
+    --peak_detection \
+    --num_peaks_filter 2 \
+    --periodicity
+
+python fiji_track_processor.py \
+    --trackfile_1 ../single_cells.csv \
+    --gene_1 her1 \
+    --fourier_transform
+
+python fiji_track_processor.py \
+    --trackfile_1 ../her1.csv \
+    --trackfile_2 ../securin.csv \
+    --gene_1 her1 \
+    --gene_2 securin 
 
 
-if __name__ == '__main__':
-    main()
-
+'''
