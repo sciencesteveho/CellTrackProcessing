@@ -3,6 +3,12 @@ Tools to plot and analyze oscillations from fiji tracks.
 
 &nbsp;
 
+<div align="center">
+    <img src='images/plot_example.png'>
+</div>
+
+&nbsp;
+
 ## Usage
 
 ```sh
