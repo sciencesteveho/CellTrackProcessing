@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # // TO-DO //
-# - [ ] move code to src folder and create custom output dir for images
+# - [X] move code to src folder and create custom output dir for images
 # - [ ] use custom colors pls no default or arthur will yell
 # - [ ] add peak selection for merge, such that plots will only include graphs where both transgenes hit the required number of peaks
 # - [ ] automatically choose nums for subplots based on parser input
@@ -14,6 +14,7 @@ import csv
 import argparse
 import numpy as np
 import pandas as pd
+import os
 from typing import Any, Dict, List
 
 import matplotlib.pyplot as plt
@@ -90,8 +91,7 @@ class FijiTrackProcessor:
         self.periodicity = periodicity
         # self.plots_per_image = plots_per_image
 
-        # set matplotlib plotting style
-        self._set_matplotlib_params()
+        self._set_matplotlib_params()  # set matplotlib plotting style
 
         # set output filename
         if self.a and self.b:
@@ -102,8 +102,16 @@ class FijiTrackProcessor:
             self.filename = f'{self.a_name}_fourier_'
         else:
             self.filename = f'{self.a_name}_'
+        
+        self._make_directories()  # make output dir
 
-    def _set_matplotlib_params(self):
+    def _make_directories(self) -> None:
+        try:
+            os.makedirs('../output')
+        except FileExistsError:
+            pass
+        
+    def _set_matplotlib_params(self) -> None:
         plt.rcParams.update({'font.size': 7})  # set font size
         plt.rcParams["font.family"] = 'Helvetica'  # set font
         plt.rcParams["figure.figsize"] = [34,18]  # set fig size
@@ -316,7 +324,7 @@ class FijiTrackProcessor:
                 #     frames[count].plot(ax=axes[r,c], color=['blue', 'red'])
                 count += 1
 
-        plt.savefig((f'{self.filename}{str(num)}.png'), format='png', dpi=300, bbox_inches='tight')
+        plt.savefig((f'../output/{self.filename}{str(num)}.png'), format='png', dpi=300, bbox_inches='tight')
         plt.close()
 
     def plot_oscillations(self) -> None:
