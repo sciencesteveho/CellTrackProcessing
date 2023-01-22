@@ -4,6 +4,21 @@ Tools to plot and analyze oscillations from fiji tracks.
 <div align="center">
     <img src='images/plot_example.png'>
 </div>
+
+&nbsp;
+
+## Installation
+
+```sh
+$ git clone https://github.com/sciencesteveho/FijiProcessing.git
+```
+
+## Dependencies
+
+```sh
+$ pip install numpy pandas more_itertools matplotlib scipy
+```
+
 &nbsp;
 
 ## Usage
@@ -76,13 +91,6 @@ $ python fiji_track_processor.py \
     --trackfile_2 ../securin.csv \
     --gene_1 her1 \
     --gene_2 securin 
-```
-
-
-## Dependencies
-
-```sh
-$ pip install csv numpy pandas more_itertools matplotlib scipy
 ```
 
 
