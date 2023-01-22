@@ -7,8 +7,34 @@ Tools to plot and analyze oscillations from fiji tracks.
 &nbsp;
 
 ## Usage
-Note: CSVs must have intensity columns titled either "TOTAL_INTENSITY_CH1" or "TOTAL_INTENSITY"
+FijiProcessor takes trackfile CSVs as input. CSVs are required to have the following headers:
+1. 'FRAME' - indicates frame in the timelapse
+2. 'TRACK_ID' - indicates the individual cell in the tissue
+3. 'TOTAL_INTENSITY_CH1' or 'TOTAL_INTENSITY' - indicates level of fluorescence
 
+&nbsp;
+
+### Required arguments:
+| Parameter     |       | Description                           |
+|---------------|-------|---------------------------------------|
+| --trackfile_1 | _STR_ | Path to fiji trackfile for overlaying |
+| --gene_1      | _STR_ | Name of fluorescent transgene         |
+
+&nbsp;
+
+### Optional Arguments:
+| Parameter           |       | Description                                                 |
+|---------------------|-------|-------------------------------------------------------------|
+| --peak_detection    |       | Use scipy's peak detection                                  |
+| --num_peaks_filter  | _INT_ | Only keep tracks with minimum n number of detected peaks    |
+| --periodicity       |       | Plot the periodicity of each trackfile instead of intensity |
+| --fourier_transform |       | Plot fourier transformed intensity                          |
+| --trackfile_2       | _STR_ | Path to second fiji trackfile for overlaying                |
+| --gene_2            | _STR_ | Name of second fluorescent gene for overlaying              |
+
+&nbsp;
+
+Note: not all arguments are compatible with one another, so see examples below for the program's capabilities.
 ```sh
 # plot a single trackfile
 $ python fiji_track_processor.py \

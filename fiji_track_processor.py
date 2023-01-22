@@ -13,14 +13,14 @@ import csv
 import argparse
 import numpy as np
 import pandas as pd
-
-import matplotlib.pyplot as plt
 from typing import Any, Dict, List
 
-import matplotlib.patches as mpatches
+import matplotlib.pyplot as plt
 import more_itertools as mit
-import scipy.fft
+
+import matplotlib.patches as mpatches
 from scipy.signal import find_peaks
+import scipy.fft
 
 
 def list_from_dictvals(input: Dict[Any, Any]) -> List[Any]:
@@ -135,7 +135,13 @@ class FijiTrackProcessor:
                 break
             
         colnames = colnames[0]
-        frame_idx = colnames.index('FRAME')
+        # def get_idxs(col_fiji, col_mastodon):
+        #     try:
+        #         return colnames.index(col_fiji)
+        #     except ValueError:
+        #         return colnames.index(col_mastodon)
+            
+        frame_idx = colnames.index('FRAME') 
         trackid_idx = colnames.index('TRACK_ID')
         try:
             intensity_idx = colnames.index('TOTAL_INTENSITY_CH1')
