@@ -2,13 +2,13 @@
 # -*- coding: utf-8 -*-
 #
 # // TO-DO //
-# - [X] move code to src folder and create custom output dir for images
 # - [ ] use custom colors pls no default or arthur will yell
 # - [ ] add peak selection for merge, such that plots will only include graphs where both transgenes hit the required number of peaks
 # - [ ] automatically choose nums for subplots based on parser input
 
 
 """Peak selection and processing for cell fluorescence tracks"""
+
 
 import csv
 import argparse
@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import more_itertools as mit
 
 import matplotlib.patches as mpatches
-from scipy.signal import find_peaks
+from scipy.signal import argrelextrema, find_peaks
 import scipy.fft
 
 
@@ -210,7 +210,12 @@ class FijiTrackProcessor:
         for track in intensities.values():
             vals = track.iloc[:,1:]
             vals = vals.to_numpy().flatten()
-            peaks,_ = find_peaks(vals)
+            # peaks,_ = find_peaks(vals)
+            peaks = argrelextrema(
+                vals,
+                comparator=np.greater,
+                order=2
+                )[0]
             peak_dict[track.columns[1]] = peaks
         return peak_dict
     
