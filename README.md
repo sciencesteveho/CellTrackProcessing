@@ -32,8 +32,8 @@ FijiProcessor takes trackfile CSVs as input. CSVs are required to have the follo
 ### Required arguments:
 | Parameter     |       | Description                           |
 |---------------|-------|---------------------------------------|
-| --trackfile_1 | _STR_ | Path to fiji trackfile for overlaying |
-| --gene_1      | _STR_ | Name of fluorescent transgene         |
+| --a | _STR_ | Path to fiji trackfile for overlaying |
+| --a_name      | _STR_ | Name of fluorescent transgene         |
 
 &nbsp;
 
@@ -44,8 +44,8 @@ FijiProcessor takes trackfile CSVs as input. CSVs are required to have the follo
 | --num_peaks_filter  | _INT_ | Only keep tracks with minimum n number of detected peaks    |
 | --periodicity       |       | Plot the periodicity of each trackfile instead of intensity |
 | --fourier_transform |       | Plot fourier transformed intensity                          |
-| --trackfile_2       | _STR_ | Path to second fiji trackfile for overlaying                |
-| --gene_2            | _STR_ | Name of second fluorescent gene for overlaying              |
+| --b       | _STR_ | Path to second fiji trackfile for overlaying                |
+| --b_name            | _STR_ | Name of second fluorescent gene for overlaying              |
 
 &nbsp;
 
@@ -53,15 +53,15 @@ Note: not all arguments are compatible with one another, so see examples below f
 ```sh
 # plot a single trackfile
 $ python fiji_track_processor.py \
-    --trackfile_1 ../single_cells.csv \
-    --gene_1 her1 
+    --a ../single_cells.csv \
+    --a_name her1 
 ```
 
 ```sh
 # plot a single track file w/ peak detection and a minimum of 2 peaks per dataset
 $ python fiji_track_processor.py \
-    --trackfile_1 ../single_cells.csv \
-    --gene_1 her1 \
+    --a ../single_cells.csv \
+    --a_name her1 \
     --peak_detection \
     --num_peaks_filter 2
 ```
@@ -69,8 +69,8 @@ $ python fiji_track_processor.py \
 ```sh
 # plot periodicity (frames between peaks)
 $ python fiji_track_processor.py \
-    --trackfile_1 ../single_cells.csv \
-    --gene_1 her1 \
+    --a ../single_cells.csv \
+    --a_name her1 \
     --peak_detection \
     --num_peaks_filter 2 \
     --periodicity
@@ -79,17 +79,17 @@ $ python fiji_track_processor.py \
 ```sh
 # plot fourier transformed graphs (frequency)
 $ python fiji_track_processor.py \
-    --trackfile_1 ../single_cells.csv \
-    --gene_1 her1 \
+    --a ../single_cells.csv \
+    --a_name her1 \
     --fourier_transform
 ```
 
 ```sh
 # plot two trackfiles merged
 $ python fiji_track_processor.py \
-    --trackfile_1 ../her1.csv \
-    --trackfile_2 ../securin.csv \
-    --gene_1 her1 \
+    --a ../her1.csv \
+    --b ../securin.csv \
+    --b_name her1 \
     --gene_2 securin 
 ```
 

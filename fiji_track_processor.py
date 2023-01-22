@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # // TO-DO //
+# - [ ] move code to src folder and create custom output dir for images
 # - [ ] use custom colors pls no default or arthur will yell
 # - [ ] add peak selection for merge, such that plots will only include graphs where both transgenes hit the required number of peaks
 # - [ ] automatically choose nums for subplots based on parser input
@@ -34,10 +35,10 @@ class FijiTrackProcessor:
     """Object to process transgene fluorescence tracks from fiji/elephant/mastodon
 
     Args:
-        trackfile_1 // name of trackfile
-        trackfile_2 // name of trackfile
-        gene_1 // name of transgene
-        gene_2 // name of transgene
+        a // name of trackfile
+        b // name of trackfile
+        a_name // name of transgene
+        b_name // name of transgene
         peak_detection // bool - option to run peak detection
         num_peaks_filter // number of peaks required for downstream
         fourier transformer // _summary
@@ -68,10 +69,10 @@ class FijiTrackProcessor:
 
     def __init__(
         self,
-        trackfile_1: str,
-        trackfile_2: str, 
-        gene_1: str, 
-        gene_2: str,
+        a: str,
+        b: str, 
+        a_name: str, 
+        b_name: str,
         peak_detection: bool,
         num_peaks_filter: int,
         fourier_transform: bool,
@@ -79,10 +80,10 @@ class FijiTrackProcessor:
         # plots_per_image: int,
         ):
         """Initialize the class"""
-        self.trackfile_1 = trackfile_1
-        self.trackfile_2 = trackfile_2
-        self.gene_1 = gene_1
-        self.gene_2 = gene_2
+        self.a = a
+        self.b = b
+        self.a_name = a_name
+        self.b_name = b_name
         self.peak_detection = peak_detection
         self.num_peaks_filter = num_peaks_filter
         self.fourier_transform = fourier_transform
@@ -93,14 +94,14 @@ class FijiTrackProcessor:
         self._set_matplotlib_params()
 
         # set output filename
-        if self.trackfile_1 and self.trackfile_2:
-            self.filename = f'{self.gene_1}_{self.gene_2}_'
+        if self.a and self.b:
+            self.filename = f'{self.a_name}_{self.b_name}_'
         elif self.periodicity:
-            self.filename = f'{self.gene_1}_periodicity_'
+            self.filename = f'{self.a_name}_periodicity_'
         elif self.fourier_transform:
-            self.filename = f'{self.gene_1}_fourier_'
+            self.filename = f'{self.a_name}_fourier_'
         else:
-            self.filename = f'{self.gene_1}_'
+            self.filename = f'{self.a_name}_'
 
     def _set_matplotlib_params(self):
         plt.rcParams.update({'font.size': 7})  # set font size
@@ -331,7 +332,7 @@ class FijiTrackProcessor:
         Returns:
             c -- _description_
         """
-        self.trackfile = self._dict_of_frame_intensities(self.trackfile_1, self.gene_1)
+        self.trackfile = self._dict_of_frame_intensities(self.a, self.a_name)
 
         # get peaks
         if self.peak_detection:
@@ -345,11 +346,11 @@ class FijiTrackProcessor:
 
         # calculate periodicity
         if self.periodicity:
-            self.trackfile = self._periodicity(self.trackfile, self.gene_1)
+            self.trackfile = self._periodicity(self.trackfile, self.a_name)
 
         # track merge if two files are provided
-        if self.trackfile_1 and self.trackfile_2:
-            track_2 = self._dict_of_frame_intensities(self.trackfile_2, self.gene_2)
+        if self.a and self.b:
+            track_2 = self._dict_of_frame_intensities(self.b, self.b_name)
             merged = self._combine_tracks(self.trackfile, track_2)
             self.trackfile = list_from_dictvals(merged)
         else:
@@ -373,23 +374,23 @@ class FijiTrackProcessor:
 def main() -> None:
     """Pipeline to process track data"""
     parser = argparse.ArgumentParser(description='Intensity Plots')
-    parser.add_argument('-track_1', '--trackfile_1', help='first transgene trackfile.csv from Fiji', type=str)
-    parser.add_argument('-track_2', '--trackfile_2', help='second transgene trackfile.csv from Fiji', type=str)
-    parser.add_argument('-g1', '--gene_1', help='Name of first transgene', type=str)
-    parser.add_argument('-g2', '--gene_2', help='Name of first transgene', type=str)
-    parser.add_argument('-p', '--peak_detection', help="Option to run peak detection", action='store_true')
-    parser.add_argument('-n', '--num_peaks_filter', help="Option to filter peaks. Use '0' for no filtering", type=int)
+    parser.add_argument('-a', '--a', help='first transgene trackfile.csv from Fiji', type=str)
+    parser.add_argument('-b', '--b', help='second transgene trackfile.csv from Fiji', type=str)
+    parser.add_argument('-an', '--a_name', help='Name of first transgene', type=str)
+    parser.add_argument('-bn', '--b_name', help='Name of first transgene', type=str)
+    parser.add_argument('-pd', '--peak_detection', help="Option to run peak detection", action='store_true')
+    parser.add_argument('-np', '--num_peaks_filter', help="Option to filter peaks. Use '0' for no filtering", type=int)
     parser.add_argument('-fft', '--fourier_transform', help="Option to run use fourier transform", action='store_true')
-    parser.add_argument('-peri', '--periodicity', help="Plot periodicity instead of intensity", action='store_true')
+    parser.add_argument('-pe', '--periodicity', help="Plot periodicity instead of intensity", action='store_true')
     # parser.add_argument('-ppi', '--plots_per_image', help="Number of plots per image", type=int)
     args = parser.parse_args()
 
     # instantiate object
     fijitrackObject = FijiTrackProcessor(
-        args.trackfile_1,
-        args.trackfile_2,
-        args.gene_1,
-        args.gene_2,
+        args.a,
+        args.b,
+        args.a_name,
+        args.b_name,
         args.peak_detection,
         args.num_peaks_filter,
         args.fourier_transform,
