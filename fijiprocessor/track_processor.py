@@ -10,19 +10,18 @@
 """Peak selection and processing for cell fluorescence tracks"""
 
 
-import csv
 import argparse
-import numpy as np
-import pandas as pd
+import csv
 import os
 from typing import Any, Dict, List
 
+import numpy as np
 import matplotlib.pyplot as plt
-import more_itertools as mit
-
 import matplotlib.patches as mpatches
-from scipy.signal import argrelextrema, find_peaks
+import more_itertools as mit
+import pandas as pd
 import scipy.fft
+from scipy.signal import argrelextrema, find_peaks
 
 
 def list_from_dictvals(input: Dict[Any, Any]) -> List[Any]:
