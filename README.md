@@ -10,7 +10,7 @@ Tools to plot and analyze oscillations from fiji tracks.
 ## Installation
 
 ```sh
-$ git clone https://github.com/sciencesteveho/FijiProcessing.git
+$ git clone https://github.com/sciencesteveho/CellTrackProcessing.git
 ```
 
 ## Dependencies
@@ -52,14 +52,14 @@ FijiProcessor takes trackfile CSVs as input. CSVs are required to have the follo
 Note: not all arguments are compatible with one another, so see examples below for the program's capabilities.
 ```sh
 # plot a single trackfile
-$ python track_processor.py \
+$ python cell_track_processor.py \
     --a ../single_cells.csv \
     --a_name her1 
 ```
 
 ```sh
 # plot a single track file w/ peak detection and a minimum of 2 peaks per dataset
-$ python track_processor.py \
+$ python cell_track_processor.py \
     --a ../single_cells.csv \
     --a_name her1 \
     --peak_detection \
@@ -68,7 +68,7 @@ $ python track_processor.py \
 
 ```sh
 # plot periodicity (frames between peaks)
-$ python track_processor.py \
+$ python cell_track_processor.py \
     --a ../single_cells.csv \
     --a_name her1 \
     --peak_detection \
@@ -78,7 +78,7 @@ $ python track_processor.py \
 
 ```sh
 # plot fourier transformed graphs (frequency)
-$ python track_processor.py \
+$ python cell_track_processor.py \
     --a ../single_cells.csv \
     --a_name her1 \
     --fourier_transform
@@ -86,7 +86,7 @@ $ python track_processor.py \
 
 ```sh
 # plot two trackfiles merged
-$ python track_processor.py \
+$ python cell_track_processor.py \
     --a ../her1.csv \
     --b ../securin.csv \
     --b_name her1 \
