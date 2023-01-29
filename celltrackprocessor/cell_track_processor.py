@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 #
 # // TO-DO //
+# - [ ] integrate chymograph code
 # - [ ] use custom colors pls no default or arthur will yell
 # - [ ] add peak selection for merge, such that plots will only include graphs where both transgenes hit the required number of peaks
 # - [ ] automatically choose nums for subplots based on parser input
 
 
-"""Peak selection and processing for cell fluorescence tracks"""
+"""Tools for the processing and analysis of cell fluorescence tracks"""
 
 
 import argparse
@@ -15,23 +16,23 @@ import csv
 import os
 from typing import Any, Dict, List
 
-import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import more_itertools as mit
+import numpy as np
 import pandas as pd
 import scipy.fft
-from scipy.signal import argrelextrema, find_peaks
+from scipy.signal import argrelextrema, find_peaks, savgol_filter
 
 
 def list_from_dictvals(input: Dict[Any, Any]) -> List[Any]:
     return [
         input[key]
         for key in input.keys()
-        ]
+    ]
 
 
-class FijiTrackProcessor:
+class TrackProcessor:
     """Object to process transgene fluorescence tracks from fiji/elephant/mastodon
 
     Args:
@@ -43,6 +44,9 @@ class FijiTrackProcessor:
         num_peaks_filter // number of peaks required for downstream
         fourier transformer // _summary
         periodicity // _summary
+
+        fourier // fourier transformed array
+        peaks // list of peak idxs for each df
 
     Methods
     ----------
@@ -65,6 +69,11 @@ class FijiTrackProcessor:
 
     # Helpers
         LOREM -- ipsum
+
+    # NOTES
+    'Spot track ID' = Track ID
+    'Spot frame' = Frames
+    'Spot intensity: total ch1'
     """
 
     def __init__(
@@ -91,6 +100,7 @@ class FijiTrackProcessor:
         # self.plots_per_image = plots_per_image
 
         self._set_matplotlib_params()  # set matplotlib plotting style
+        self._make_directories()  # make output dir
 
         # set output filename
         if self.a and self.b:
@@ -101,8 +111,6 @@ class FijiTrackProcessor:
             self.filename = f'{self.a_name}_fourier_'
         else:
             self.filename = f'{self.a_name}_'
-        
-        self._make_directories()  # make output dir
 
     def _make_directories(self) -> None:
         try:
@@ -119,15 +127,15 @@ class FijiTrackProcessor:
         return [
             list(c)
             for c in mit.divide(int(len(input)/100) + 1, input)
-            ]
+        ]
 
     def _dict_of_frame_intensities(
         self,
         trackfile: str,
         gene: str
         ) -> Dict[int, pd.DataFrame]:
-        """Opens CSV and stores each sequence of intensities to corresponding trackID
-        in an individual dataframe
+        """Opens CSV and stores each sequence of intensities to corresponding
+        trackID in an individual dataframe
 
         Returns:
             intensities -- dictionary with k : v // trackid : dataframe
@@ -167,33 +175,33 @@ class FijiTrackProcessor:
                     templist.append(
                         (items[frame_idx],
                         int(items[intensity_idx]))
-                        )
+                    )
                 elif index != length-2:  # append if not a new id, else, continue
                     if items[trackid_idx] != str(int(trackid) + 1):
                         templist.append(
                             (items[frame_idx],
                             int(items[intensity_idx]))
-                            )
+                        )
                     else:
                         intensities[int(trackid)] = pd.DataFrame(
                             templist,
                             columns=['frame', gene + "_" + trackid]
-                            )
+                        )
                         templist = []
                         trackid = items[trackid_idx]
                         templist.append(
                             (items[frame_idx],
                             int(items[intensity_idx]))
-                            )
+                        )
                 else:  # append at last line
                     templist.append(
                         (items[frame_idx],
                         int(items[intensity_idx]))
-                        )
+                    )
                     intensities[int(trackid)] = pd.DataFrame(
                         templist,
                         columns=['frame', gene + "_" + trackid]
-                        )
+                    )
         return intensities
     
     def _detect_peaks(self, intensities: Dict[int, pd.DataFrame]) -> None:
@@ -210,11 +218,7 @@ class FijiTrackProcessor:
             vals = track.iloc[:,1:]
             vals = vals.to_numpy().flatten()
             # peaks,_ = find_peaks(vals)
-            peaks = argrelextrema(
-                vals,
-                comparator=np.greater,
-                order=2
-                )[0]
+            peaks = argrelextrema(vals, comparator=np.greater, order=2)[0]
             peak_dict[track.columns[1]] = peaks
         return peak_dict
     
@@ -240,7 +244,7 @@ class FijiTrackProcessor:
                 how='left',
                 left_on='frame',
                 right_on='frame'
-                )
+            )
             merged_dict[ids] = merged
         return merged_dict
     
@@ -254,17 +258,17 @@ class FijiTrackProcessor:
             int(item[0].split("_")[1])
             for item in peaks.items()
             if len(item[1]) >= self.num_peaks_filter
-            ]
+        ]
         filtered_intensity = {
             key: value
             for key, value in intensities.items()
             if key in trackids_keep
-            }
+        }
         filtered_peaks = {
             key: value 
             for key, value in peaks.items()
             if int(key.split("_")[1]) in trackids_keep
-            }
+        }
         return filtered_intensity, filtered_peaks
     
     def _periodicity(
@@ -294,8 +298,9 @@ class FijiTrackProcessor:
         frames,
         num,
         ):
-        """Plots in matplotlib and saves figure. Chunks into groups of 100, and adds
-        dummy frames if len(frames) is less than 100, otherwise will throw IndexError.
+        """Plots in matplotlib and saves figure. Chunks into groups of 100, and
+        adds dummy frames if len(frames) is less than 100, otherwise will
+        throw IndexError.
         """
         if len(frames) < 100:
             difference = 100 - len(frames)
@@ -321,6 +326,10 @@ class FijiTrackProcessor:
                             print(count)
                         ax=axes[r,c]
                         ax.plot(frames[count].index, linevals)
+                        try:
+                            ax.plot(savgol_filter(linevals, 15, 3))
+                        except ValueError:
+                            pass
                         patch = mpatches.Patch(label=colname)
                         ax.legend(handles=[patch])
                         ax.plot(self.peaks[colname], markers, "x")
@@ -328,7 +337,12 @@ class FijiTrackProcessor:
                 #     frames[count].plot(ax=axes[r,c], color=['blue', 'red'])
                 count += 1
 
-        plt.savefig((f'../output/{self.filename}{str(num)}.png'), format='png', dpi=300, bbox_inches='tight')
+        plt.savefig(
+            (f'../output/{self.filename}{str(num)}.png'),
+            format='png',
+            dpi=300,
+            bbox_inches='tight'
+            )
         plt.close()
 
     def plot_oscillations(self) -> None:
@@ -380,25 +394,65 @@ class FijiTrackProcessor:
                 10,
                 miniframe,
                 index,
-                )
+            )
 
 
 def main() -> None:
     """Pipeline to process track data"""
     parser = argparse.ArgumentParser(description='Intensity Plots')
-    parser.add_argument('-a', '--a', help='first transgene trackfile.csv from Fiji', type=str)
-    parser.add_argument('-b', '--b', help='second transgene trackfile.csv from Fiji', type=str)
-    parser.add_argument('-an', '--a_name', help='Name of first transgene', type=str)
-    parser.add_argument('-bn', '--b_name', help='Name of first transgene', type=str)
-    parser.add_argument('-pd', '--peak_detection', help="Option to run peak detection", action='store_true')
-    parser.add_argument('-np', '--num_peaks_filter', help="Option to filter peaks. Use '0' for no filtering", type=int)
-    parser.add_argument('-fft', '--fourier_transform', help="Option to run use fourier transform", action='store_true')
-    parser.add_argument('-pe', '--periodicity', help="Plot periodicity instead of intensity", action='store_true')
+    parser.add_argument(
+        '-a',
+        '--a',
+        help='first transgene trackfile.csv from Fiji',
+        type=str,
+    )
+    parser.add_argument(
+        '-b',
+        '--b',
+        help='second transgene trackfile.csv from Fiji',
+        type=str,
+    )
+    parser.add_argument(
+        '-an',
+        '--a_name',
+        help='Name of first transgene',
+        type=str,
+    )
+    parser.add_argument(
+        '-bn',
+        '--b_name',
+        help='Name of first transgene',
+        type=str,
+    )
+    parser.add_argument(
+        '-pd',
+        '--peak_detection',
+        help="Option to run peak detection",
+        action='store_true',
+    )
+    parser.add_argument(
+        '-np',
+        '--num_peaks_filter',
+        help="Option to filter peaks. Use '0' for no filtering",
+        type=int,
+    )
+    parser.add_argument(
+        '-fft',
+        '--fourier_transform',
+        help="Option to run use fourier transform",
+        action='store_true',
+    )
+    parser.add_argument(
+        '-pe',
+        '--periodicity',
+        help="Plot periodicity instead of intensity",
+        action='store_true',
+    )
     # parser.add_argument('-ppi', '--plots_per_image', help="Number of plots per image", type=int)
     args = parser.parse_args()
 
     # instantiate object
-    fijitrackObject = FijiTrackProcessor(
+    trackObject = TrackProcessor(
         args.a,
         args.b,
         args.a_name,
@@ -408,12 +462,20 @@ def main() -> None:
         args.fourier_transform,
         args.periodicity,
         # args.plots_per_image,
-        )
+    )
     
     # run pipeline! 
-    fijitrackObject.plot_oscillations()
+    trackObject.plot_oscillations()
 
 
 if __name__ == '__main__':
     main()
 
+'''
+import pandas as pd
+
+df = pd.read_csv(
+    'test-vertices.csv',
+    header=[0,1],
+    )
+'''

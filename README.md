@@ -16,7 +16,7 @@ $ git clone https://github.com/sciencesteveho/CellTrackProcessing.git
 ## Dependencies
 
 ```sh
-$ pip install numpy pandas more_itertools matplotlib scipy
+$ pip install numpy pandas more_itertools matplotlib scipy scikit-image
 ```
 
 &nbsp;
@@ -92,8 +92,12 @@ $ python cell_track_processor.py \
     --b_name her1 \
     --gene_2 securin 
 ```
+&nbsp;
+## Authors
+____________
 
-
+* Steve Ho
+* Daniel McCusker
 
 
 
