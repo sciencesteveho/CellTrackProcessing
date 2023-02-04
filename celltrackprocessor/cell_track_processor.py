@@ -3,6 +3,8 @@
 #
 # // TO-DO //
 # - [ ] integrate chymograph code
+# - [ ] add fxn to get individual plots
+# - [ ] implement proper transforms for merged data
 # - [ ] use custom colors pls no default or arthur will yell
 # - [ ] add peak selection for merge, such that plots will only include graphs where both transgenes hit the required number of peaks
 # - [ ] automatically choose nums for subplots based on parser input
@@ -12,24 +14,20 @@
 
 
 import argparse
-import csv
 import os
 from typing import Any, Dict, List
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import more_itertools as mit
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 import numpy as np
 import pandas as pd
 import scipy.fft
 from scipy.signal import argrelextrema, find_peaks, savgol_filter
+from skimage import img_as_bool
 
-
-def list_from_dictvals(input: Dict[Any, Any]) -> List[Any]:
-    return [
-        input[key]
-        for key in input.keys()
-    ]
+from utils import list_from_dictvals
 
 
 class TrackProcessor:
@@ -64,17 +62,18 @@ class TrackProcessor:
         lorem ipsum
     _plot_intensities:
         lorem ipsum
-    plot_oscillations:
+    plotdata:
         lorem ipsum
 
     # Helpers
-        LOREM -- ipsum
+        KEEP_COLS -- name of columns to keep in dataframe
 
     # NOTES
     'Spot track ID' = Track ID
     'Spot frame' = Frames
     'Spot intensity: total ch1'
     """
+    KEEP_COLS = ['TRACK_ID', 'POSITION_X', 'POSITION_Y', 'FRAME']
 
     def __init__(
         self,
@@ -85,7 +84,7 @@ class TrackProcessor:
         peak_detection: bool,
         num_peaks_filter: int,
         fourier_transform: bool,
-        periodicity: bool,
+        period: bool,
         # plots_per_image: int,
         ):
         """Initialize the class"""
@@ -96,7 +95,7 @@ class TrackProcessor:
         self.peak_detection = peak_detection
         self.num_peaks_filter = num_peaks_filter
         self.fourier_transform = fourier_transform
-        self.periodicity = periodicity
+        self.period = period
         # self.plots_per_image = plots_per_image
 
         self._set_matplotlib_params()  # set matplotlib plotting style
@@ -105,12 +104,36 @@ class TrackProcessor:
         # set output filename
         if self.a and self.b:
             self.filename = f'{self.a_name}_{self.b_name}_'
-        elif self.periodicity:
+        elif self.period:
             self.filename = f'{self.a_name}_periodicity_'
         elif self.fourier_transform:
             self.filename = f'{self.a_name}_fourier_'
         else:
             self.filename = f'{self.a_name}_'
+
+        # start setting attributes
+        self.track_df = self._dict_of_frame_intensities(self.a, self.a_name)
+
+        #merge if 2 files, else run the gamut 
+        if self.a and self.b:
+            track_2 = self._dict_of_frame_intensities(self.b, self.b_name)
+            self.merged = self._combine_tracks(self.track_df, track_2)
+        else:
+            # get peaks
+            if self.peak_detection:
+                self.peaks = self._detect_peaks(self.track_df)
+            else:
+                self.peaks = {}
+
+            # filter
+            if self.num_peaks_filter:
+                self.track_df, self.peaks = self._filter_n_peaks(self.track_df, self.peaks)
+
+            # fft
+            self.fourier = self._fft(self.track_df)
+
+            # calculate periodicity
+            self.periodicity = self._periodicity(self.track_df, self.a_name)
 
     def _make_directories(self) -> None:
         try:
@@ -123,88 +146,50 @@ class TrackProcessor:
         plt.rcParams["font.family"] = 'Helvetica'  # set font
         plt.rcParams["figure.figsize"] = [34,18]  # set fig size
 
-    def _chunklist(self, input: List[Any]) -> List[List[Any]]:
-        return [
-            list(c)
-            for c in mit.divide(int(len(input)/100) + 1, input)
-        ]
-
     def _dict_of_frame_intensities(
         self,
         trackfile: str,
         gene: str
         ) -> Dict[int, pd.DataFrame]:
-        """Opens CSV and stores each sequence of intensities to corresponding
-        trackID in an individual dataframe
+        """Opens CSV and stores each sequence of intensities to its
+        corresponding trackID in an individual dataframe. 
 
         Returns:
             intensities -- dictionary with k : v // trackid : dataframe
+            each df has a column w/ frame number and max intensity
         """
-        with open(trackfile, newline = '') as file:
-            length = len(file.readlines())
+        df = pd.read_csv(
+            trackfile,
+            header=[0],
+        )
 
-        with open(trackfile, newline = '') as file:
-            file_reader = csv.reader(file, delimiter=',')
-            colnames = []
-            for row in file_reader:
-                colnames.append(row)
-                break
-            
-        colnames = colnames[0]
-        # def get_idxs(col_fiji, col_mastodon):
-        #     try:
-        #         return colnames.index(col_fiji)
-        #     except ValueError:
-        #         return colnames.index(col_mastodon)
-            
-        frame_idx = colnames.index('FRAME') 
-        trackid_idx = colnames.index('TRACK_ID')
-        try:
-            intensity_idx = colnames.index('TOTAL_INTENSITY_CH1')
-        except ValueError:
-            intensity_idx = colnames.index('TOTAL_INTENSITY')
+        intensity_key = 'TOTAL_INTENSITY_CH1'
+        if intensity_key in df.columns:
+            self.intensity_key = intensity_key
+        else:
+            self.intensity_key = 'TOTAL_INTENSITY'
+        self.KEEP_COLS.append(self.intensity_key)
 
-        with open(trackfile, newline = '') as file:
-            file_reader = csv.reader(file, delimiter=',')
-            next(file_reader)  # skip header
-            intensities = {}
-            for index, items in enumerate(file_reader):
-                if index == 0:  # first trackid
-                    trackid = items[trackid_idx]
-                    templist = []
-                    templist.append(
-                        (items[frame_idx],
-                        int(items[intensity_idx]))
-                    )
-                elif index != length-2:  # append if not a new id, else, continue
-                    if items[trackid_idx] != str(int(trackid) + 1):
-                        templist.append(
-                            (items[frame_idx],
-                            int(items[intensity_idx]))
-                        )
-                    else:
-                        intensities[int(trackid)] = pd.DataFrame(
-                            templist,
-                            columns=['frame', gene + "_" + trackid]
-                        )
-                        templist = []
-                        trackid = items[trackid_idx]
-                        templist.append(
-                            (items[frame_idx],
-                            int(items[intensity_idx]))
-                        )
-                else:  # append at last line
-                    templist.append(
-                        (items[frame_idx],
-                        int(items[intensity_idx]))
-                    )
-                    intensities[int(trackid)] = pd.DataFrame(
-                        templist,
-                        columns=['frame', gene + "_" + trackid]
-                    )
-        return intensities
+        track_df = {}
+        for idx in df.TRACK_ID.unique():
+            sub_df = df[df['TRACK_ID'] == idx]
+            sub_df = sub_df[self.KEEP_COLS]
+            df_name = f"{gene}_{sub_df['TRACK_ID'].iloc[0]}"
+            sub_df.rename(columns={self.intensity_key: df_name}, inplace=True)
+            sub_df.name = df_name
+            track_df[idx] = sub_df
+
+        return track_df
     
-    def _detect_peaks(self, intensities: Dict[int, pd.DataFrame]) -> None:
+    def _fft(self, intensities: Dict[int, pd.DataFrame]) -> Dict[int, pd.DataFrame]:
+        """_summary_"""
+        df2 = {}
+        for item in intensities:
+            df2[item] = intensities[item].copy()
+            df2[item].iloc[:,-1:] = scipy.fft.fft(df2[item].iloc[:,-1:])
+        return df2
+    
+    def _detect_peaks(self, intensities: Dict[int, pd.DataFrame]) -> Dict[int, pd.DataFrame]:
         """Detect peaks using scipy find_peaks
         
         Args:
@@ -215,12 +200,17 @@ class TrackProcessor:
         """
         peak_dict = {}
         for track in intensities.values():
-            vals = track.iloc[:,1:]
-            vals = vals.to_numpy().flatten()
+            vals = track.iloc[:,-1:].to_numpy()
             # peaks,_ = find_peaks(vals)
             peaks = argrelextrema(vals, comparator=np.greater, order=2)[0]
-            peak_dict[track.columns[1]] = peaks
+            peak_dict[track.name] = peaks
         return peak_dict
+    
+    def _chunklist(self, input: List[Any]) -> List[List[Any]]:
+        return [
+            list(c)
+            for c in mit.divide(int(len(input)/100) + 1, input)
+        ]
     
     def _combine_tracks(
         self,
@@ -239,11 +229,11 @@ class TrackProcessor:
         merged_dict = {}
         for ids in range(0, len(dict1)-1):
             merged = pd.merge(
-                left = dict1[ids],
+                left=dict1[ids],
                 right=dict2[ids],
                 how='left',
-                left_on='frame',
-                right_on='frame'
+                left_on='TRACK_ID',
+                right_on='TRACK_ID'
             )
             merged_dict[ids] = merged
         return merged_dict
@@ -281,14 +271,14 @@ class TrackProcessor:
         for idx, items in enumerate(self.peaks.items()):
             periodicity_keeper = []
             frameid = int(items[0].split("_")[1])
-            frames = intensities[frameid].iloc[:,0]
+            frames = intensities[frameid]['FRAME'].to_numpy()
             for item in items[1]:
                 if item == items[1][0]:
                     periodicity_keeper.append(int(frames[item]) - int(frames[0]))
                 else:
                     idx = np.where(items[1] == item)[0][0]
                     periodicity_keeper.append(int(frames[item]) - int(frames[items[1][idx-1]]))
-            periodicity[frameid] = pd.DataFrame(periodicity_keeper, columns=[gene + "_" + str(frameid)])
+            periodicity[frameid] = pd.DataFrame(periodicity_keeper, columns=[f'{gene}_{str(frameid)}'])
         return periodicity
 
     def _plot_intensities(
@@ -297,6 +287,7 @@ class TrackProcessor:
         ncol,
         frames,
         num,
+        peaks,
         ):
         """Plots in matplotlib and saves figure. Chunks into groups of 100, and
         adds dummy frames if len(frames) is less than 100, otherwise will
@@ -311,7 +302,7 @@ class TrackProcessor:
         _, axes = plt.subplots(nrow, ncol)
         for r in range(nrow):
             for c in range(ncol):
-                if self.periodicity or len(self.peaks) <= 1:
+                if len(peaks) <= 1:
                     frames[count].plot(ax=axes[r,c], color=['blue', 'red'])
                 else: 
                     if frames[count].columns[0] == 'dummy':
@@ -321,18 +312,18 @@ class TrackProcessor:
                         vals = frames[count].iloc[:,1:].to_numpy().flatten()
                         colname = frames[count].columns[1]
                         try:
-                            markers = vals[self.peaks[colname]]
+                            markers = vals[peaks[colname]]
                         except IndexError:
                             print(count)
                         ax=axes[r,c]
-                        ax.plot(frames[count].index, linevals)
+                        ax.plot(frames[count].FRAME, linevals)
                         try:
                             ax.plot(savgol_filter(linevals, 15, 3))
                         except ValueError:
                             pass
                         patch = mpatches.Patch(label=colname)
                         ax.legend(handles=[patch])
-                        ax.plot(self.peaks[colname], markers, "x")
+                        ax.plot(peaks[colname], markers, "x")
                 # else:
                 #     frames[count].plot(ax=axes[r,c], color=['blue', 'red'])
                 count += 1
@@ -341,11 +332,11 @@ class TrackProcessor:
             (f'../output/{self.filename}{str(num)}.png'),
             format='png',
             dpi=300,
-            bbox_inches='tight'
-            )
+            bbox_inches='tight',
+        )
         plt.close()
 
-    def plot_oscillations(self) -> None:
+    def plotdata(self, intensities: Dict[int, pd.DataFrame]) -> None:
         """_summary_
 
         Args:
@@ -358,42 +349,26 @@ class TrackProcessor:
         Returns:
             c -- _description_
         """
-        self.trackfile = self._dict_of_frame_intensities(self.a, self.a_name)
-
-        # get peaks
-        if self.peak_detection:
-            self.peaks = self._detect_peaks(self.trackfile)
+        if self.period:
+            peaks = {}
+            dfs = list_from_dictvals(self.periodicity)
+        elif self.fourier_transform:
+            peaks = {}
+            dfs = list_from_dictvals(self.fourier)
         else:
-            self.peaks = {}
+            peaks = self.peaks
+            dfs = list_from_dictvals(intensities)
+            dfs = [frame.iloc[:,-2:] for frame in dfs]
 
-        # filter
-        if self.num_peaks_filter:
-            self.trackfile, self.peaks = self._filter_n_peaks(self.trackfile, self.peaks)
-
-        # calculate periodicity
-        if self.periodicity:
-            self.trackfile = self._periodicity(self.trackfile, self.a_name)
-
-        # track merge if two files are provided
-        if self.a and self.b:
-            track_2 = self._dict_of_frame_intensities(self.b, self.b_name)
-            merged = self._combine_tracks(self.trackfile, track_2)
-            self.trackfile = list_from_dictvals(merged)
-        else:
-            self.trackfile = list_from_dictvals(self.trackfile)
-        
-        # plot 
-        chunks = self._chunklist(self.trackfile)
-        if self.fourier_transform:
-            for chunk in chunks:
-                for subchunk in chunk:
-                    subchunk.iloc[:,1] = scipy.fft.fft(subchunk.iloc[:,1])
+        # plot
+        chunks = self._chunklist(dfs)
         for index, miniframe in enumerate(chunks):
             self._plot_intensities(
-                10,
-                10,
-                miniframe,
-                index,
+                nrow=10,
+                ncol=10,
+                frames=miniframe,
+                num=index,
+                peaks=peaks,
             )
 
 
@@ -444,7 +419,7 @@ def main() -> None:
     )
     parser.add_argument(
         '-pe',
-        '--periodicity',
+        '--period',
         help="Plot periodicity instead of intensity",
         action='store_true',
     )
@@ -460,12 +435,12 @@ def main() -> None:
         args.peak_detection,
         args.num_peaks_filter,
         args.fourier_transform,
-        args.periodicity,
+        args.period
         # args.plots_per_image,
     )
     
     # run pipeline! 
-    trackObject.plot_oscillations()
+    trackObject.plotdata(intensities=trackObject.track_df)
 
 
 if __name__ == '__main__':
