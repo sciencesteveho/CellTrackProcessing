@@ -92,12 +92,6 @@ $ python cell_track_processor.py \
     --b_name her1 \
     --gene_2 securin 
 ```
-&nbsp;
-## Authors
-____________
-
-* Steve Ho
-* Daniel McCusker
 
 
 
